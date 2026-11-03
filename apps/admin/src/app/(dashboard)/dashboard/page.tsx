@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   const s = stats
   const chartData = monthly?.map(m => ({
-    name: formatMonth(m.month),
+    name: formatMonth(String(m.month)),
     আয়: Math.round(m.income / 100),
     ব্যয়: Math.round(m.expense / 100),
     লাভ: Math.round(m.profit / 100),
