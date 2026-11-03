@@ -3,7 +3,7 @@ services:
     name: yakin-api
     runtime: node
     plan: free
-    buildCommand: npm install -g pnpm@9 && pnpm install --frozen-lockfile && pnpm db:generate && pnpm --filter @yakin/api build
+    buildCommand: npm install -g pnpm@9 && NODE_ENV=development pnpm install --frozen-lockfile && pnpm db:generate && pnpm --filter @yakin/api build
     startCommand: pnpm db:migrate:prod && pnpm db:seed && node apps/api/dist/index.js
     envVars:
       - key: NODE_ENV
@@ -35,7 +35,7 @@ services:
     name: yakin-admin
     runtime: node
     plan: free
-    buildCommand: npm install -g pnpm@9 && pnpm install --frozen-lockfile && pnpm --filter @yakin/admin build
+    buildCommand: npm install -g pnpm@9 && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @yakin/admin build
     startCommand: pnpm --filter @yakin/admin start
     envVars:
       - key: NODE_ENV
