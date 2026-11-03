@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import bcrypt from 'bcryptjs'
 import speakeasy from 'speakeasy'
 import { z } from 'zod'
-import { cuid } from '@paralleldrive/cuid2'
+import { createId } from '@paralleldrive/cuid2'
 import { signAccessToken, signRefreshToken, verifyRefreshToken, getRefreshTokenExpiry } from '../utils/jwt'
 import { sendSuccess, sendError } from '../utils/response'
 import { writeAuditLog } from '../utils/audit'
@@ -97,7 +97,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     })
 
     // Create refresh token record
-    const tokenId = cuid()
+    const tokenId = createId()
     const expiresAt = getRefreshTokenExpiry()
     const refreshTokenStr = signRefreshToken({ sub: user.id, tokenId })
     await fastify.prisma.refreshToken.create({ data: { id: tokenId, userId: user.id, token: refreshTokenStr, expiresAt, userAgent: ua, ipAddress: ip } })
@@ -142,7 +142,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     // Rotate: revoke old, issue new
     await fastify.prisma.refreshToken.update({ where: { id: payload.tokenId }, data: { isRevoked: true } })
 
-    const tokenId = cuid()
+    const tokenId = createId()
     const expiresAt = getRefreshTokenExpiry()
     const newRefreshToken = signRefreshToken({ sub: user.id, tokenId })
     await fastify.prisma.refreshToken.create({ data: { id: tokenId, userId: user.id, token: newRefreshToken, expiresAt, userAgent: request.headers['user-agent'], ipAddress: request.ip } })

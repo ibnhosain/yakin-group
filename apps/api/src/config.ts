@@ -1,6 +1,16 @@
 // API configuration — all values from environment variables
 // Never hardcode secrets here
 
+// Load .env before reading process.env (monorepo: root .env is 2 levels up)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const _dotenv = require('dotenv')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const _path = require('path')
+_dotenv.config({ path: _path.resolve(__dirname, '../../../.env') })   // dev: from apps/api/src
+_dotenv.config({ path: _path.resolve(__dirname, '../../.env') })      // dev: from apps/api
+_dotenv.config({ path: _path.resolve(process.cwd(), '../../.env') })  // dev: from CWD
+_dotenv.config()                                                        // prod: from CWD
+
 export const config = {
   port: parseInt(process.env.API_PORT ?? '3001', 10),
   host: process.env.API_HOST ?? '0.0.0.0',

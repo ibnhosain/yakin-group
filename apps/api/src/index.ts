@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { validateConfig } from './config'
 import { buildApp } from './app'
 import { config } from './config'

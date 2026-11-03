@@ -153,6 +153,7 @@ model Member {
   status          MemberStatus @default(PENDING)
   totalShares     Int          @default(0)
   totalInvested   Int          @default(0) // paisa
+  approvalId      String?      @unique
   deletedAt       DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -163,8 +164,7 @@ model Member {
   shareTransfersFrom ShareTransfer[] @relation("fromMember")
   shareTransfersTo   ShareTransfer[] @relation("toMember")
   payments     MemberPayment[]
-  documents    Document[]        @relation("memberDocuments")
-  approval     Approval?         @relation("memberApproval")
+  approval     Approval?         @relation("memberApproval", fields: [approvalId], references: [id])
 
   @@index([memberNo])
   @@index([status])
@@ -328,7 +328,6 @@ model Investment {
   plan         InvestmentPlan      @relation(fields: [planId], references: [id])
   transactions InvestmentTransaction[]
   approval     Approval?           @relation(fields: [approvalId], references: [id])
-  documents    Document[]          @relation("investmentDocuments")
 
   @@index([investorId])
   @@index([status])
@@ -413,7 +412,6 @@ model Business {
   bankAccounts BankAccount[]
   customers  Customer[]
   suppliers  Supplier[]
-  documents  Document[]    @relation("businessDocuments")
   employees  Employee[]    @relation("businessEmployees")
 
   @@map("businesses")
@@ -459,7 +457,6 @@ model Property {
   updatedAt      DateTime      @updatedAt
 
   owners     PropertyOwner[]
-  documents  Document[]       @relation("propertyDocuments")
   transactions PropertyTransaction[]
 
   @@index([propertyNo])
@@ -552,7 +549,6 @@ model Project {
   business  Business      @relation(fields: [businessId], references: [id])
   tasks     ProjectTask[]
   milestones ProjectMilestone[]
-  documents Document[]    @relation("projectDocuments")
 
   @@index([businessId])
   @@index([status])
@@ -854,7 +850,6 @@ model Employee {
   attendance  Attendance[]
   leaveRequests LeaveRequest[]
   payrollRecords PayrollRecord[]
-  documents   Document[]  @relation("employeeDocuments")
 
   @@index([employeeNo])
   @@index([status])
@@ -1011,6 +1006,7 @@ model Document {
   mimeType     String
   ownerType    String?  // "member", "investor", "employee", "business", "project", "property"
   ownerId      String?
+  meetingId    String?  // for meeting attachments
   expiresAt    DateTime?
   version      Int      @default(1)
   parentId     String?  // for versioned documents
@@ -1025,12 +1021,7 @@ model Document {
   parent     Document?         @relation("documentVersions", fields: [parentId], references: [id])
   versions   Document[]        @relation("documentVersions")
 
-  memberDocs   Member?   @relation("memberDocuments",   fields: [ownerId], references: [id])
-  investmentDocs Investment? @relation("investmentDocuments", fields: [ownerId], references: [id])
-  employeeDocs Employee? @relation("employeeDocuments", fields: [ownerId], references: [id])
-  businessDocs Business? @relation("businessDocuments", fields: [ownerId], references: [id])
-  projectDocs  Project?  @relation("projectDocuments",  fields: [ownerId], references: [id])
-  propertyDocs Property? @relation("propertyDocuments", fields: [ownerId], references: [id])
+  meetingDocs  Meeting?  @relation("meetingDocuments", fields: [meetingId], references: [id])
 
   @@index([ownerType, ownerId])
   @@map("documents")
@@ -1059,7 +1050,7 @@ model Meeting {
 
   organizer  User              @relation(fields: [organizerId], references: [id])
   attendees  MeetingAttendee[]
-  documents  Document[]        @relation("projectDocuments")
+  documents  Document[]        @relation("meetingDocuments")
 
   @@map("meetings")
 }
@@ -1163,6 +1154,7 @@ model Approval {
 
   memberApproval   Member?       @relation("memberApproval")
   investment       Investment?
+
   shareTransfer    ShareTransfer?
   leaveRequest     LeaveRequest?
   payrollRecord    PayrollRecord?
