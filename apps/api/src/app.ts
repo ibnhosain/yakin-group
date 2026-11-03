@@ -9,6 +9,11 @@ import { dashboardRoutes } from './routes/dashboard'
 import { memberRoutes } from './routes/members'
 import { accountingRoutes } from './routes/accounting'
 import { approvalRoutes } from './routes/approvals'
+import { investorRoutes } from './routes/investors'
+import { employeeRoutes } from './routes/employees'
+import { businessRoutes } from './routes/businesses'
+import { notificationRoutes } from './routes/notifications'
+import { settingsRoutes } from './routes/settings'
 import { config } from './config'
 
 export async function buildApp() {
@@ -56,6 +61,11 @@ export async function buildApp() {
   await fastify.register(memberRoutes, { prefix: '/api/members' })
   await fastify.register(accountingRoutes, { prefix: '/api/accounting' })
   await fastify.register(approvalRoutes, { prefix: '/api/approvals' })
+  await fastify.register(investorRoutes, { prefix: '/api/investors' })
+  await fastify.register(employeeRoutes, { prefix: '/api/hr/employees' })
+  await fastify.register(businessRoutes, { prefix: '/api/businesses' })
+  await fastify.register(notificationRoutes, { prefix: '/api/notifications' })
+  await fastify.register(settingsRoutes, { prefix: '/api/settings' })
 
   // 404 handler
   fastify.setNotFoundHandler((request, reply) => {

@@ -128,11 +128,15 @@ export interface InvestorListItem {
   id: string
   investorNo: string
   fullName: string
+  fullNameBn: string | null
   phone: string | null
   email: string | null
-  totalInvested: number // paisa
+  totalInvestment: number // paisa (active investments total)
+  totalInvested: number // paisa (all time)
   totalWithdrawn: number // paisa
+  activeInvestments: number // count
   status: InvestorStatus
+  createdAt: string
 }
 
 export interface InvestmentListItem {
@@ -153,10 +157,14 @@ export interface BusinessListItem {
   id: string
   name: string
   nameBn: string | null
+  category: string
   categoryName: string
   location: string | null
   capital: number // paisa
+  totalInvestment: number // paisa
   status: BusinessStatus
+  establishedDate: string | null
+  createdAt: string
 }
 
 // ─── Projects ─────────────────────────────────
@@ -165,12 +173,14 @@ export type ProjectStatus = 'PLANNING' | 'APPROVED' | 'IN_PROGRESS' | 'ON_HOLD' 
 export interface ProjectListItem {
   id: string
   name: string
+  nameBn: string | null
   businessName: string
   managerName: string | null
   budget: number // paisa
-  progressPercent: number
+  progressPercent: number | null
   status: ProjectStatus
   startDate: string | null
+  endDate: string | null
   expectedEndDate: string | null
 }
 
@@ -183,12 +193,16 @@ export interface PropertyListItem {
   id: string
   propertyNo: string
   name: string
+  nameBn: string | null
   location: string
+  district: string | null
+  division: string | null
   propertyType: PropertyType
-  totalArea: number
+  area: number
   areaUnit: AreaUnit
+  totalArea: number
   purchasePrice: number // paisa
-  currentValue: number // paisa
+  currentValue: number | null // paisa
   status: PropertyStatus
 }
 
@@ -199,12 +213,17 @@ export interface EmployeeListItem {
   id: string
   employeeNo: string
   fullName: string
+  fullNameBn: string | null
   phone: string | null
+  department: string | null
+  designation: string | null
   departmentName: string | null
   designationName: string | null
   basicSalary: number // paisa
   status: EmployeeStatus
+  joinDate: string
   joiningDate: string
+  createdAt: string
 }
 
 // ─── Accounting ───────────────────────────────
@@ -218,6 +237,7 @@ export interface AccountListItem {
   type: AccountType
   balance: number // paisa
   parentName: string | null
+  level: number | null
 }
 
 export interface JournalEntryRequest {
@@ -241,7 +261,9 @@ export interface ApprovalListItem {
   id: string
   type: ApprovalType
   requesterName: string
+  reviewerName: string | null
   requestNote: string | null
+  decisionNote: string | null
   status: ApprovalStatus
   requestedAt: string
   decidedAt: string | null
@@ -267,7 +289,8 @@ export interface DashboardStats {
 }
 
 export interface MonthlyFinancial {
-  month: string
+  year: number
+  month: number  // 1-12
   income: number  // paisa
   expense: number // paisa
   profit: number  // paisa
@@ -281,10 +304,12 @@ export interface NotificationItem {
   type: NotificationType
   title: string
   titleBn: string | null
-  body: string
+  body: string | null
   bodyBn: string | null
   isRead: boolean
   sentAt: string
+  createdAt: string
+  readAt: string | null
 }
 
 // ─── Utility types ────────────────────────────
