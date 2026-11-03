@@ -4,9 +4,9 @@ services:
     name: yakin-api
     runtime: node
     plan: free
-    rootDir: apps/api
-    buildCommand: cd ../.. && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @yakin/api build && pnpm exec prisma generate
-    startCommand: node dist/index.js
+    buildCommand: npm install -g pnpm@9 && pnpm install --frozen-lockfile && pnpm db:generate && pnpm --filter @yakin/api build
+    startCommand: node apps/api/dist/index.js
+    releaseCommand: pnpm db:migrate:prod && pnpm db:seed
     envVars:
       - key: NODE_ENV
         value: production
@@ -18,34 +18,28 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
-      - key: PORT
-        value: 3001
-      - key: CORS_ORIGINS
+      - key: ALLOWED_ORIGINS
         value: https://yakin-admin.onrender.com
       - key: BCRYPT_ROUNDS
         value: "12"
-      - key: JWT_ACCESS_EXPIRES
+      - key: JWT_ACCESS_EXPIRES_IN
         value: "15m"
-      - key: JWT_REFRESH_EXPIRES
+      - key: JWT_REFRESH_EXPIRES_IN
         value: "7d"
-      - key: MAX_LOGIN_ATTEMPTS
-        value: "5"
-      - key: LOCKOUT_DURATION
-        value: "15"
       - key: TOTP_ISSUER
         value: "Yakin Group"
-      - key: UPLOAD_DIR
-        value: ./uploads
-    releaseCommand: cd ../.. && pnpm exec prisma migrate deploy
+      - key: SEED_ADMIN_EMAIL
+        value: admin@yakingroup.com
+      - key: SEED_ADMIN_PASSWORD
+        generateValue: true
 
   # ── Admin Panel (Next.js) ──────────────────────────────────────────────────
   - type: web
     name: yakin-admin
     runtime: node
     plan: free
-    rootDir: apps/admin
-    buildCommand: cd ../.. && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @yakin/admin build
-    startCommand: pnpm start
+    buildCommand: npm install -g pnpm@9 && pnpm install --frozen-lockfile && pnpm --filter @yakin/admin build
+    startCommand: pnpm --filter @yakin/admin start
     envVars:
       - key: NODE_ENV
         value: production
