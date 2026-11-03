@@ -1,0 +1,1244 @@
+// Yakin Group - Complete Database Schema
+// All monetary values stored as Int (paisa/subunit) to avoid floating-point errors
+// Soft deletes: records are never hard-deleted; deletedAt marks removal
+// Audit trail: every financial table has createdBy + updatedBy
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// AUTH & PERMISSIONS
+// ─────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. "super_admin", "chairman"
+  displayName String   // e.g. "সুপার অ্যাডমিন"
+  displayNameEn String // e.g. "Super Admin"
+  permissions Json     @default("[]") // string[] of "resource:action"
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  roleId          String
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String
+  twoFactorSecret String?
+  twoFactorEnabled Boolean  @default(false)
+  isActive        Boolean   @default(true)
+  isEmailVerified Boolean   @default(false)
+  fullName        String
+  fullNameBn      String?
+  avatarUrl       String?
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  failedLoginCount Int      @default(0)
+  lockedUntil     DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  role              Role               @relation(fields: [roleId], references: [id])
+  member            Member?
+  investor          Investor?
+  employee          Employee?
+  refreshTokens     RefreshToken[]
+  loginHistory      LoginHistory[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  meetingAttendees  MeetingAttendee[]
+  requestedApprovals Approval[]       @relation("requester")
+  reviewedApprovals  Approval[]       @relation("reviewer")
+  assignedTasks     ProjectTask[]
+  createdDocuments  Document[]
+  createdMeetings   Meeting[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([roleId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  status    LoginStatus
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("login_history")
+}
+
+enum LoginStatus {
+  SUCCESS
+  FAILED_PASSWORD
+  FAILED_2FA
+  FAILED_ACCOUNT_LOCKED
+  FAILED_ACCOUNT_INACTIVE
+}
+
+// ─────────────────────────────────────────────
+// MEMBERS
+// ─────────────────────────────────────────────
+
+model MemberCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameBn      String
+  description String?
+  membershipFee Int    @default(0) // paisa
+  sharePrice  Int      @default(0) // paisa per share
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members Member[]
+
+  @@map("member_categories")
+}
+
+model Member {
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  categoryId      String
+  memberNo        String       @unique // e.g. YGM-2024-001
+  nidNumber       String?
+  dateOfBirth     DateTime?
+  gender          Gender?
+  occupation      String?
+  address         String?
+  permanentAddress String?
+  photoUrl        String?
+  signatureUrl    String?
+  nomineeName     String?
+  nomineeRelation String?
+  nomineePhone    String?
+  nomineeNid      String?
+  membershipDate  DateTime     @default(now())
+  status          MemberStatus @default(PENDING)
+  totalShares     Int          @default(0)
+  totalInvested   Int          @default(0) // paisa
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id])
+  category     MemberCategory    @relation(fields: [categoryId], references: [id])
+  shares       Share[]
+  shareTransfersFrom ShareTransfer[] @relation("fromMember")
+  shareTransfersTo   ShareTransfer[] @relation("toMember")
+  payments     MemberPayment[]
+  documents    Document[]        @relation("memberDocuments")
+  approval     Approval?         @relation("memberApproval")
+
+  @@index([memberNo])
+  @@index([status])
+  @@map("members")
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  REJECTED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Share {
+  id            String   @id @default(cuid())
+  memberId      String
+  quantity      Int
+  faceValue     Int      // paisa per share
+  purchasePrice Int      // paisa total
+  purchaseDate  DateTime @default(now())
+  certificateNo String   @unique
+  certificateUrl String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  member   Member         @relation(fields: [memberId], references: [id])
+  transfers ShareTransfer[]
+
+  @@index([memberId])
+  @@index([certificateNo])
+  @@map("shares")
+}
+
+model ShareTransfer {
+  id             String   @id @default(cuid())
+  shareId        String
+  fromMemberId   String
+  toMemberId     String
+  quantity       Int
+  transferPrice  Int      // paisa
+  transferDate   DateTime @default(now())
+  reason         String?
+  approvalId     String?  @unique
+  createdAt      DateTime @default(now())
+
+  share      Share    @relation(fields: [shareId], references: [id])
+  fromMember Member   @relation("fromMember", fields: [fromMemberId], references: [id])
+  toMember   Member   @relation("toMember", fields: [toMemberId], references: [id])
+  approval   Approval? @relation(fields: [approvalId], references: [id])
+
+  @@index([fromMemberId])
+  @@index([toMemberId])
+  @@map("share_transfers")
+}
+
+model MemberPayment {
+  id            String        @id @default(cuid())
+  memberId      String
+  type          MemberPaymentType
+  amount        Int           // paisa
+  paymentDate   DateTime      @default(now())
+  paymentMethod PaymentMethod @default(CASH)
+  referenceNo   String?
+  note          String?
+  receiptUrl    String?
+  createdAt     DateTime      @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([memberId])
+  @@map("member_payments")
+}
+
+enum MemberPaymentType {
+  MEMBERSHIP_FEE
+  SHARE_PURCHASE
+  RENEWAL
+  OTHER
+}
+
+// ─────────────────────────────────────────────
+// INVESTORS & INVESTMENTS
+// ─────────────────────────────────────────────
+
+model InvestmentPlan {
+  id              String   @id @default(cuid())
+  name            String
+  nameBn          String
+  description     String?
+  minimumAmount   Int      // paisa
+  maximumAmount   Int?     // paisa
+  durationMonths  Int
+  profitRule      Json     // { type: "fixed_percent" | "profit_share", value: number }
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  investments Investment[]
+
+  @@map("investment_plans")
+}
+
+model Investor {
+  id              String         @id @default(cuid())
+  userId          String         @unique
+  investorNo      String         @unique // e.g. YGI-2024-001
+  nidNumber       String?
+  dateOfBirth     DateTime?
+  gender          Gender?
+  address         String?
+  bankName        String?
+  bankAccount     String?
+  bankBranch      String?
+  taxIdNumber     String?
+  totalInvested   Int            @default(0) // paisa
+  totalWithdrawn  Int            @default(0) // paisa
+  status          InvestorStatus @default(PENDING)
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id])
+  investments Investment[]
+
+  @@index([investorNo])
+  @@map("investors")
+}
+
+enum InvestorStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+model Investment {
+  id              String           @id @default(cuid())
+  investorId      String
+  planId          String
+  investmentNo    String           @unique // e.g. YGN-2024-001
+  principalAmount Int              // paisa
+  startDate       DateTime
+  endDate         DateTime?
+  status          InvestmentStatus @default(PENDING)
+  agreementUrl    String?
+  agreementDate   DateTime?
+  notes           String?
+  approvalId      String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  investor     Investor            @relation(fields: [investorId], references: [id])
+  plan         InvestmentPlan      @relation(fields: [planId], references: [id])
+  transactions InvestmentTransaction[]
+  approval     Approval?           @relation(fields: [approvalId], references: [id])
+  documents    Document[]          @relation("investmentDocuments")
+
+  @@index([investorId])
+  @@index([status])
+  @@map("investments")
+}
+
+enum InvestmentStatus {
+  PENDING
+  UNDER_REVIEW
+  AGREEMENT_PENDING
+  PAYMENT_PENDING
+  ACTIVE
+  MATURED
+  CLOSED
+  REJECTED
+}
+
+model InvestmentTransaction {
+  id           String                    @id @default(cuid())
+  investmentId String
+  type         InvestmentTransactionType
+  amount       Int                       // paisa
+  balanceAfter Int                       // paisa running balance
+  description  String?
+  receiptUrl   String?
+  paymentMethod PaymentMethod            @default(CASH)
+  referenceNo  String?
+  transactionDate DateTime              @default(now())
+  createdById  String
+  createdAt    DateTime                  @default(now())
+
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId])
+  @@map("investment_transactions")
+}
+
+enum InvestmentTransactionType {
+  DEPOSIT
+  PROFIT_CREDIT
+  LOSS_DEBIT
+  WITHDRAWAL
+  PARTIAL_WITHDRAWAL
+  REFUND
+}
+
+// ─────────────────────────────────────────────
+// BUSINESSES
+// ─────────────────────────────────────────────
+
+model BusinessCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameBn    String
+  createdAt DateTime @default(now())
+
+  businesses Business[]
+
+  @@map("business_categories")
+}
+
+model Business {
+  id          String         @id @default(cuid())
+  categoryId  String
+  name        String
+  nameBn      String?
+  description String?
+  managerId   String?
+  location    String?
+  capital     Int            @default(0) // paisa
+  status      BusinessStatus @default(ACTIVE)
+  startedAt   DateTime?
+  licenseNo   String?
+  taxId       String?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  category   BusinessCategory @relation(fields: [categoryId], references: [id])
+  projects   Project[]
+  accounts   Account[]
+  bankAccounts BankAccount[]
+  customers  Customer[]
+  suppliers  Supplier[]
+  documents  Document[]    @relation("businessDocuments")
+  employees  Employee[]    @relation("businessEmployees")
+
+  @@map("businesses")
+}
+
+enum BusinessStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+// ─────────────────────────────────────────────
+// PROPERTIES / LAND
+// ─────────────────────────────────────────────
+
+model Property {
+  id             String        @id @default(cuid())
+  propertyNo     String        @unique // e.g. YGP-2024-001
+  name           String
+  nameBn         String?
+  propertyType   PropertyType  @default(LAND)
+  location       String
+  locationBn     String?
+  googleMapsUrl  String?
+  latitude       Float?
+  longitude      Float?
+  totalArea      Float
+  areaUnit       AreaUnit      @default(DECIMAL)
+  purchasePrice  Int           // paisa
+  currentValue   Int           // paisa
+  sellerName     String?
+  sellerPhone    String?
+  sellerAddress  String?
+  registrationNo String?
+  mutationNo     String?
+  taxYear        String?
+  taxAmount      Int           @default(0) // paisa
+  status         PropertyStatus @default(ACTIVE)
+  purchaseDate   DateTime
+  notes          String?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  owners     PropertyOwner[]
+  documents  Document[]       @relation("propertyDocuments")
+  transactions PropertyTransaction[]
+
+  @@index([propertyNo])
+  @@map("properties")
+}
+
+enum PropertyType {
+  LAND
+  BUILDING
+  APARTMENT
+  COMMERCIAL
+  AGRICULTURAL
+  OTHER
+}
+
+enum AreaUnit {
+  DECIMAL
+  KATHA
+  BIGHA
+  ACRE
+  SQFT
+  SQMETER
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD
+  MORTGAGED
+  DISPUTED
+}
+
+model PropertyOwner {
+  id          String   @id @default(cuid())
+  propertyId  String
+  ownerName   String
+  ownerPhone  String?
+  ownerType   String   // "organization", "individual", "investor"
+  sharePercent Float   @default(100)
+  acquiredDate DateTime
+  createdAt   DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@map("property_owners")
+}
+
+model PropertyTransaction {
+  id          String   @id @default(cuid())
+  propertyId  String
+  type        String   // "purchase", "sale", "valuation_update", "expense"
+  amount      Int      // paisa
+  description String?
+  date        DateTime @default(now())
+  createdById String
+  createdAt   DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@map("property_transactions")
+}
+
+// ─────────────────────────────────────────────
+// PROJECTS
+// ─────────────────────────────────────────────
+
+model Project {
+  id               String        @id @default(cuid())
+  businessId       String
+  name             String
+  nameBn           String?
+  description      String?
+  category         String?
+  managerId        String?
+  location         String?
+  budget           Int           @default(0) // paisa
+  estimatedCost    Int           @default(0) // paisa
+  actualExpenses   Int           @default(0) // paisa
+  totalIncome      Int           @default(0) // paisa
+  progressPercent  Int           @default(0)
+  status           ProjectStatus @default(PLANNING)
+  startDate        DateTime?
+  expectedEndDate  DateTime?
+  actualEndDate    DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  business  Business      @relation(fields: [businessId], references: [id])
+  tasks     ProjectTask[]
+  milestones ProjectMilestone[]
+  documents Document[]    @relation("projectDocuments")
+
+  @@index([businessId])
+  @@index([status])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNING
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+model ProjectTask {
+  id          String     @id @default(cuid())
+  projectId   String
+  assignedToId String?
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id])
+  assignedTo User?   @relation(fields: [assignedToId], references: [id])
+
+  @@index([projectId])
+  @@map("project_tasks")
+}
+
+model ProjectMilestone {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  targetDate  DateTime
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("project_milestones")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ─────────────────────────────────────────────
+// ACCOUNTING (Double-Entry)
+// ─────────────────────────────────────────────
+
+model Account {
+  id          String      @id @default(cuid())
+  businessId  String?
+  code        String      @unique // e.g. "1001"
+  name        String
+  nameBn      String?
+  type        AccountType
+  parentId    String?
+  balance     Int         @default(0) // paisa (debit positive for assets/expenses)
+  isActive    Boolean     @default(true)
+  isSystem    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  business     Business?       @relation(fields: [businessId], references: [id])
+  parent       Account?        @relation("accountHierarchy", fields: [parentId], references: [id])
+  children     Account[]       @relation("accountHierarchy")
+  journalLines JournalLine[]
+  bankAccounts BankAccount[]
+
+  @@index([code])
+  @@index([businessId])
+  @@map("accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model JournalEntry {
+  id          String      @id @default(cuid())
+  refNo       String      @unique // e.g. JE-2024-001
+  date        DateTime
+  description String
+  descriptionBn String?
+  isPosted    Boolean     @default(false)
+  postedAt    DateTime?
+  voucherType VoucherType @default(JOURNAL)
+  attachmentUrl String?
+  createdById String
+  postedById  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  lines JournalLine[]
+
+  @@index([date])
+  @@index([refNo])
+  @@map("journal_entries")
+}
+
+enum VoucherType {
+  JOURNAL
+  PAYMENT
+  RECEIPT
+  CONTRA
+}
+
+model JournalLine {
+  id          String @id @default(cuid())
+  entryId     String
+  accountId   String
+  debit       Int    @default(0) // paisa
+  credit      Int    @default(0) // paisa
+  narration   String?
+  createdAt   DateTime @default(now())
+
+  entry   JournalEntry @relation(fields: [entryId], references: [id])
+  account Account      @relation(fields: [accountId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+model BankAccount {
+  id          String   @id @default(cuid())
+  businessId  String?
+  accountId   String?  // linked chart-of-accounts entry
+  bankName    String
+  accountNo   String   @unique
+  accountName String
+  branchName  String?
+  routingNo   String?
+  swiftCode   String?
+  balance     Int      @default(0) // paisa
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business     Business?  @relation(fields: [businessId], references: [id])
+  account      Account?   @relation(fields: [accountId], references: [id])
+  transactions BankTransaction[]
+
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id            String              @id @default(cuid())
+  bankAccountId String
+  type          BankTransactionType
+  amount        Int                 // paisa
+  balanceAfter  Int                 // paisa
+  description   String?
+  referenceNo   String?
+  date          DateTime            @default(now())
+  isReconciled  Boolean             @default(false)
+  reconciledAt  DateTime?
+  createdById   String
+  createdAt     DateTime            @default(now())
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+
+  @@index([bankAccountId])
+  @@map("bank_transactions")
+}
+
+enum BankTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  CHARGE
+  INTEREST
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMERS & SUPPLIERS
+// ─────────────────────────────────────────────
+
+model Customer {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  nameBn      String?
+  phone       String?
+  email       String?
+  address     String?
+  balance     Int      @default(0) // paisa (positive = they owe us)
+  isActive    Boolean  @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
+  @@map("customers")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  nameBn      String?
+  phone       String?
+  email       String?
+  address     String?
+  outstanding Int      @default(0) // paisa (positive = we owe them)
+  isActive    Boolean  @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
+  @@map("suppliers")
+}
+
+// ─────────────────────────────────────────────
+// HR — EMPLOYEES
+// ─────────────────────────────────────────────
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameBn    String?
+  managerId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Designation {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameBn    String?
+  grade     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  employees Employee[]
+
+  @@map("designations")
+}
+
+model Employee {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  businessId      String?
+  departmentId    String?
+  designationId   String?
+  employeeNo      String           @unique // e.g. YGE-2024-001
+  nidNumber       String?
+  dateOfBirth     DateTime?
+  gender          Gender?
+  address         String?
+  emergencyPhone  String?
+  basicSalary     Int              @default(0) // paisa/month
+  allowances      Json             @default("{}") // { house: 5000, transport: 2000, ... }
+  joiningDate     DateTime
+  confirmationDate DateTime?
+  status          EmployeeStatus   @default(ACTIVE)
+  bankAccountNo   String?
+  bankName        String?
+  deletedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id])
+  business    Business?   @relation("businessEmployees", fields: [businessId], references: [id])
+  department  Department? @relation(fields: [departmentId], references: [id])
+  designation Designation? @relation(fields: [designationId], references: [id])
+  attendance  Attendance[]
+  leaveRequests LeaveRequest[]
+  payrollRecords PayrollRecord[]
+  documents   Document[]  @relation("employeeDocuments")
+
+  @@index([employeeNo])
+  @@index([status])
+  @@map("employees")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  RESIGNED
+  TERMINATED
+}
+
+model Attendance {
+  id          String           @id @default(cuid())
+  employeeId  String
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  status      AttendanceStatus @default(PRESENT)
+  method      AttendanceMethod @default(MANUAL)
+  lateMinutes Int              @default(0)
+  earlyMinutes Int             @default(0)
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+  @@map("attendance")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  WEEKEND
+}
+
+enum AttendanceMethod {
+  MANUAL
+  QR_CODE
+  BIOMETRIC
+}
+
+model LeaveType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameBn    String?
+  maxDays   Int      @default(0)
+  isPaid    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  leaveRequests LeaveRequest[]
+
+  @@map("leave_types")
+}
+
+model LeaveRequest {
+  id          String      @id @default(cuid())
+  employeeId  String
+  leaveTypeId String
+  fromDate    DateTime
+  toDate      DateTime
+  totalDays   Int
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  approvalId  String?     @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  leaveType  LeaveType  @relation(fields: [leaveTypeId], references: [id])
+  approval   Approval?  @relation(fields: [approvalId], references: [id])
+
+  @@index([employeeId])
+  @@map("leave_requests")
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model PayrollRecord {
+  id           String        @id @default(cuid())
+  employeeId   String
+  month        Int           // 1-12
+  year         Int
+  basicSalary  Int           // paisa
+  allowances   Int           @default(0) // paisa
+  overtimePay  Int           @default(0) // paisa
+  deductions   Int           @default(0) // paisa (tax + others)
+  netSalary    Int           // paisa
+  workingDays  Int
+  presentDays  Int
+  leaveDays    Int           @default(0)
+  status       PayrollStatus @default(DRAFT)
+  paidAt       DateTime?
+  paymentMethod PaymentMethod @default(BANK_TRANSFER)
+  referenceNo  String?
+  approvalId   String?       @unique
+  createdById  String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  employee Employee  @relation(fields: [employeeId], references: [id])
+  approval Approval? @relation(fields: [approvalId], references: [id])
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@map("payroll_records")
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENTS
+// ─────────────────────────────────────────────
+
+model DocumentCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  nameBn    String?
+  icon      String?
+  createdAt DateTime @default(now())
+
+  documents Document[]
+
+  @@map("document_categories")
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  categoryId   String?
+  title        String
+  description  String?
+  fileUrl      String
+  fileName     String
+  fileSize     Int      // bytes
+  mimeType     String
+  ownerType    String?  // "member", "investor", "employee", "business", "project", "property"
+  ownerId      String?
+  expiresAt    DateTime?
+  version      Int      @default(1)
+  parentId     String?  // for versioned documents
+  uploadedById String
+  isPublic     Boolean  @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   DocumentCategory? @relation(fields: [categoryId], references: [id])
+  uploadedBy User              @relation(fields: [uploadedById], references: [id])
+  parent     Document?         @relation("documentVersions", fields: [parentId], references: [id])
+  versions   Document[]        @relation("documentVersions")
+
+  memberDocs   Member?   @relation("memberDocuments",   fields: [ownerId], references: [id])
+  investmentDocs Investment? @relation("investmentDocuments", fields: [ownerId], references: [id])
+  employeeDocs Employee? @relation("employeeDocuments", fields: [ownerId], references: [id])
+  businessDocs Business? @relation("businessDocuments", fields: [ownerId], references: [id])
+  projectDocs  Project?  @relation("projectDocuments",  fields: [ownerId], references: [id])
+  propertyDocs Property? @relation("propertyDocuments", fields: [ownerId], references: [id])
+
+  @@index([ownerType, ownerId])
+  @@map("documents")
+}
+
+// ─────────────────────────────────────────────
+// MEETINGS
+// ─────────────────────────────────────────────
+
+model Meeting {
+  id           String      @id @default(cuid())
+  title        String
+  titleBn      String?
+  type         MeetingType @default(BOARD)
+  scheduledAt  DateTime
+  venue        String?
+  agenda       String?
+  agendaBn     String?
+  minutes      String?
+  minutesBn    String?
+  decisions    String?
+  status       MeetingStatus @default(SCHEDULED)
+  organizerId  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  organizer  User              @relation(fields: [organizerId], references: [id])
+  attendees  MeetingAttendee[]
+  documents  Document[]        @relation("projectDocuments")
+
+  @@map("meetings")
+}
+
+enum MeetingType {
+  BOARD
+  GENERAL
+  EMERGENCY
+  COMMITTEE
+  TEAM
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model MeetingAttendee {
+  id        String   @id @default(cuid())
+  meetingId String
+  userId    String
+  attended  Boolean  @default(false)
+  role      String?  // "presenter", "secretary", etc.
+  createdAt DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
+  @@map("meeting_attendees")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id          String               @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  titleBn     String?
+  body        String
+  bodyBn      String?
+  data        Json?                // extra payload
+  isRead      Boolean              @default(false)
+  readAt      DateTime?
+  sentVia     NotificationChannel[]
+  sentAt      DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  GENERAL
+  INVESTMENT_UPDATE
+  MEMBER_UPDATE
+  PAYMENT_REMINDER
+  APPROVAL_REQUEST
+  APPROVAL_DECISION
+  MEETING_INVITE
+  TASK_ASSIGNED
+  SALARY_PROCESSED
+  LEAVE_DECISION
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+// ─────────────────────────────────────────────
+// APPROVALS
+// ─────────────────────────────────────────────
+
+model Approval {
+  id              String         @id @default(cuid())
+  type            ApprovalType
+  refId           String?        // ID of the thing being approved
+  requesterId     String
+  reviewerId      String?
+  status          ApprovalStatus @default(PENDING)
+  requestNote     String?
+  decisionNote    String?
+  requestedAt     DateTime       @default(now())
+  decidedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  requester   User      @relation("requester", fields: [requesterId], references: [id])
+  reviewer    User?     @relation("reviewer", fields: [reviewerId], references: [id])
+
+  memberApproval   Member?       @relation("memberApproval")
+  investment       Investment?
+  shareTransfer    ShareTransfer?
+  leaveRequest     LeaveRequest?
+  payrollRecord    PayrollRecord?
+
+  @@index([type, status])
+  @@map("approvals")
+}
+
+enum ApprovalType {
+  NEW_MEMBERSHIP
+  INVESTMENT_APPLICATION
+  INVESTMENT_WITHDRAWAL
+  SHARE_TRANSFER
+  LAND_PURCHASE
+  LAND_SALE
+  PROJECT_BUDGET
+  EXPENSE_APPROVAL
+  LEAVE_REQUEST
+  SALARY_PAYMENT
+  FINANCIAL_ADJUSTMENT
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// SYSTEM
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // "CREATE", "UPDATE", "DELETE", "LOGIN", etc.
+  tableName  String
+  recordId   String?
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([tableName, recordId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("system_settings")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS (shared)
+// ─────────────────────────────────────────────
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  MOBILE_BANKING
+  ONLINE
+  OTHER
+}

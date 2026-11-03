@@ -1,0 +1,24 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: yakin_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: yakin_group_db
+      POSTGRES_USER: yakin_user
+      POSTGRES_PASSWORD: Yakin@Secure2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - yakin_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yakin_user -d yakin_group_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  yakin_postgres_data:
+    driver: local

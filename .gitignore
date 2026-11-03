@@ -1,0 +1,15 @@
+node_modules
+.next
+dist
+build
+.turbo
+*.log
+.env
+.env.local
+.env.production
+.DS_Store
+coverage
+.expo
+android
+ios
+*.tsbuildinfo

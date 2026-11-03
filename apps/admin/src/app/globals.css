@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy:   #0f2d5e;
+  --emerald: #0d7c5f;
+  --gold:   #c9902a;
+  --bg:     #f8f9fb;
+  --surface: #ffffff;
+}
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; }
+  body { background-color: var(--bg); color: #0e1523; }
+  .dark body { background-color: #0a0f1a; color: #e8edf5; }
+
+  /* Bengali text rendering */
+  [lang="bn"], .bn {
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+  }
+}
+
+@layer utilities {
+  .taka::before { content: '৳'; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(15, 45, 94, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(15, 45, 94, 0.4); }
