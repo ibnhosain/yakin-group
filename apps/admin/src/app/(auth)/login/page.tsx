@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
 import { login } from '@/lib/auth'
 
 const loginSchema = z.object({
@@ -19,6 +20,7 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -84,12 +86,22 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-[#0e1523] mb-1.5 font-bengali">পাসওয়ার্ড</label>
-              <input
-                {...register('password')}
-                type="password"
-                placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-[#0e1523] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f2d5e] focus:border-transparent transition"
-              />
+              <div className="relative">
+                <input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 pr-11 rounded-lg border border-gray-200 text-[#0e1523] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f2d5e] focus:border-transparent transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0f2d5e] transition"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               {errors.password && <p className="mt-1 text-xs text-red-600 font-bengali">{errors.password.message}</p>}
             </div>
 
