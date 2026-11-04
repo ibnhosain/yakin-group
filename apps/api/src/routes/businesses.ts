@@ -21,6 +21,14 @@ const createSchema = z.object({
 
 export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
 
+  // GET /api/businesses/categories
+  fastify.get('/categories', { preHandler: [authenticate] },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      const cats = await fastify.prisma.businessCategory.findMany({ orderBy: { name: 'asc' } })
+      return sendSuccess(reply, cats)
+    }
+  )
+
   // GET /api/businesses
   fastify.get('/', { preHandler: [authenticate, requirePermission('businesses:read')] },
     async (req: FastifyRequest<{ Querystring: { search?: string; status?: string; page?: string; limit?: string } }>, reply: FastifyReply) => {

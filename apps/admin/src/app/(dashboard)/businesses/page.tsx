@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { BusinessListItem } from '@yakin/types'
 import { formatTaka, formatDate, toBengaliNumber } from '@yakin/utils'
 import { Building2, Search, Plus, Eye } from 'lucide-react'
+import Link from 'next/link'
 
 export default function BusinessesPage() {
   const [search, setSearch] = useState('')
@@ -22,9 +23,9 @@ export default function BusinessesPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">ব্যবসা প্রতিষ্ঠান</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল ব্যবসা ইউনিটের তালিকা</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/businesses/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন ব্যবসা
-        </button>
+        </Link>
       </div>
 
       <div className="relative w-72">
@@ -72,9 +73,9 @@ export default function BusinessesPage() {
                 <span className="text-gray-700 text-xs">{biz.establishedDate ? formatDate(biz.establishedDate) : '—'}</span>
               </div>
             </div>
-            <button className="mt-4 w-full flex items-center justify-center gap-1.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition font-bengali">
+            <Link href={`/businesses/${biz.id}`} className="mt-4 w-full flex items-center justify-center gap-1.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition font-bengali">
               <Eye size={13} /> বিস্তারিত দেখুন
-            </button>
+            </Link>
           </div>
         ))}
       </div>

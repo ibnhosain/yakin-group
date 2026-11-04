@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { InvestorListItem } from '@yakin/types'
 import { formatTaka, formatDate, toBengaliNumber } from '@yakin/utils'
 import { TrendingUp, Search, Plus, Eye } from 'lucide-react'
+import Link from 'next/link'
 
 export default function InvestorsPage() {
   const [search, setSearch] = useState('')
@@ -25,9 +26,9 @@ export default function InvestorsPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">বিনিয়োগকারী</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল বিনিয়োগকারীর তালিকা</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/investors/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন বিনিয়োগকারী
-        </button>
+        </Link>
       </div>
 
       {/* Search */}
@@ -89,9 +90,9 @@ export default function InvestorsPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{formatDate(inv.createdAt)}</td>
                   <td className="px-4 py-3 text-center">
-                    <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <Link href={`/investors/${inv.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 inline-flex">
                       <Eye size={15} />
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}

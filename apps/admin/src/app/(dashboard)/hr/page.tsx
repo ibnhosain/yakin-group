@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { EmployeeListItem } from '@yakin/types'
 import { formatTaka, formatDate, toBengaliNumber } from '@yakin/utils'
 import { UserCheck, Search, Plus, Eye } from 'lucide-react'
+import Link from 'next/link'
 
 export default function HRPage() {
   const [search, setSearch] = useState('')
@@ -25,9 +26,9 @@ export default function HRPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">মানবসম্পদ ব্যবস্থাপনা</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">কর্মী তালিকা ও বেতন</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/hr/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন কর্মী
-        </button>
+        </Link>
       </div>
 
       <div className="relative w-72">
@@ -91,9 +92,9 @@ export default function HRPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <Link href={`/hr/${emp.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 inline-flex">
                       <Eye size={15} />
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}

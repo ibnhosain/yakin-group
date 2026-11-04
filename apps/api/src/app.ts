@@ -14,6 +14,7 @@ import { employeeRoutes } from './routes/employees'
 import { businessRoutes } from './routes/businesses'
 import { notificationRoutes } from './routes/notifications'
 import { settingsRoutes } from './routes/settings'
+import { hrRoutes } from './routes/hr'
 import { config } from './config'
 
 export async function buildApp() {
@@ -62,6 +63,7 @@ export async function buildApp() {
   await fastify.register(accountingRoutes, { prefix: '/api/accounting' })
   await fastify.register(approvalRoutes, { prefix: '/api/approvals' })
   await fastify.register(investorRoutes, { prefix: '/api/investors' })
+  await fastify.register(hrRoutes, { prefix: '/api/hr' })
   await fastify.register(employeeRoutes, { prefix: '/api/hr/employees' })
   await fastify.register(businessRoutes, { prefix: '/api/businesses' })
   await fastify.register(notificationRoutes, { prefix: '/api/notifications' })
