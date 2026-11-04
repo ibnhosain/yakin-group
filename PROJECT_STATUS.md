@@ -1,7 +1,7 @@
 # Yakin Group — Project Status & Handoff
 
 > এই ফাইল প্রতিটি কাজের শেষে আপডেট করতে হবে।  
-> Last updated: 2026-11-04
+> Last updated: 2026-11-04 (session 2)
 
 ---
 
@@ -122,21 +122,22 @@ Admin login: `admin@yakingroup.com` / `Admin@12345`
 ### High Priority
 
 #### 1. API — Missing routes
-- [ ] `GET /api/documents/:id` — document detail by ID নেই (admin workaround দিয়ে list থেকে খোঁজা হচ্ছে)
-- [ ] `PATCH /api/investors/:id` — investor update
-- [ ] `PATCH /api/hr/employees/:id` — employee update
-- [ ] `PATCH /api/businesses/:id` — business update/status change
+- [x] `GET /api/documents/:id` — ✅ done
+- [x] `PATCH /api/investors/:id` — ✅ done
+- [x] `PATCH /api/hr/employees/:id` — ✅ done
+- [x] `PATCH /api/businesses/:id` — ✅ done (includes status change)
 - [ ] `GET /api/accounting/journal-entries/:id` — single entry detail
-- [ ] `POST /api/accounting/journal-entries/:id/post` — entry posting (isPosted = true)
+- [ ] `POST /api/members/:id` — member update route missing
 
 #### 2. Admin UI — Missing pages/features
-- [ ] `/investors/[id]` — investment transactions tab (বিনিয়োগ যোগ/দেখা)
-- [ ] `/hr/[id]` — salary update, attendance entry form
-- [ ] `/businesses/[id]` — status change (ACTIVE/INACTIVE)
+- [x] `/investors/[id]` — field names fixed, edit modal added, bank info section ✅
+- [x] `/hr/[id]` — field names fixed (user.*, attendance, emergencyPhone), edit modal + status change ✅
+- [x] `/businesses/[id]` — status toggle + edit modal ✅
+- [x] `/documents/[id]` — now uses GET /api/documents/:id directly ✅
+- [x] `/accounting` — journal Post button added ✅
 - [ ] `/projects/[id]` — task add/edit, milestone add/edit
 - [ ] `/properties/[id]` — transaction (buy/sell) যোগ করা
-- [ ] `/accounting` — journal entry detail view, post/unpost action
-- [ ] Edit forms — সব detail page-এ edit button ও form নেই
+- [ ] `/members/[id]` — edit form নেই
 
 #### 3. Mobile App (Expo)
 - [ ] `apps/mobile/` — সব screen বাকি (শুধু boilerplate আছে)
@@ -213,3 +214,4 @@ PROJECT_STATUS.md          ← এই ফাইল — আপডেট রাখ
 | 2026-11-04 | Projects, properties, meetings, documents CRUD pages + API |
 | 2026-11-04 | Schema mismatch fix (businesses/investors/employees), journal entry form |
 | 2026-11-04 | Auto-deploy চালু (render.yaml), PROJECT_STATUS.md তৈরি |
+| 2026-11-04 | PATCH routes (investors/employees/businesses), GET documents/:id, edit modals on detail pages, journal Post button |
