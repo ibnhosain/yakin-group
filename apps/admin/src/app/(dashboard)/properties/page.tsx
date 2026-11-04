@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { PropertyListItem } from '@yakin/types'
 import { formatTaka, formatDate } from '@yakin/utils'
-import { MapPin, Search, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { MapPin, Search, Plus, Eye } from 'lucide-react'
 
 const TYPE_BN: Record<string, string> = {
   AGRICULTURAL: 'কৃষি জমি', RESIDENTIAL: 'আবাসিক', COMMERCIAL: 'বাণিজ্যিক', INDUSTRIAL: 'শিল্প', OTHER: 'অন্যান্য',
@@ -29,9 +30,9 @@ export default function PropertiesPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">জমি ও সম্পত্তি</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল জমি ও সম্পত্তির রেকর্ড</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/properties/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন সম্পত্তি
-        </button>
+        </Link>
       </div>
 
       <div className="relative w-72">
@@ -54,6 +55,7 @@ export default function PropertiesPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase font-bengali">ক্রয়মূল্য</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase font-bengali">বর্তমান মূল্য</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase font-bengali">স্ট্যাটাস</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -90,6 +92,11 @@ export default function PropertiesPage() {
                     }`}>
                       {STATUS_BN[prop.status] ?? prop.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link href={`/properties/${prop.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#0f2d5e] transition inline-flex">
+                      <Eye size={15} />
+                    </Link>
                   </td>
                 </tr>
               ))}

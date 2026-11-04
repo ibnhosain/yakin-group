@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { formatDate, toBengaliNumber } from '@yakin/utils'
+import Link from 'next/link'
 import { FileText, Search, Plus, Download, Eye } from 'lucide-react'
 
 interface Document {
@@ -42,9 +43,9 @@ export default function DocumentsPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">দলিলপত্র ব্যবস্থাপনা</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল গুরুত্বপূর্ণ দস্তাবেজ</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/documents/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> আপলোড করুন
-        </button>
+        </Link>
       </div>
 
       <div className="flex gap-3">
@@ -93,12 +94,12 @@ export default function DocumentsPage() {
               </div>
             </div>
             <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-              <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bengali text-gray-600 hover:bg-gray-50 transition">
+              <Link href={`/documents/${doc.id}`} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bengali text-gray-600 hover:bg-gray-50 transition">
                 <Eye size={13} /> দেখুন
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bengali text-gray-600 hover:bg-gray-50 transition">
+              </Link>
+              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bengali text-gray-600 hover:bg-gray-50 transition">
                 <Download size={13} /> ডাউনলোড
-              </button>
+              </a>
             </div>
           </div>
         ))}

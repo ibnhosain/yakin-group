@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { ProjectListItem } from '@yakin/types'
 import { formatTaka, formatDate, toBengaliNumber } from '@yakin/utils'
+import Link from 'next/link'
 import { FolderKanban, Search, Plus, Eye } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,9 +35,9 @@ export default function ProjectsPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">প্রজেক্ট ব্যবস্থাপনা</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল প্রজেক্টের অগ্রগতি</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/projects/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন প্রজেক্ট
-        </button>
+        </Link>
       </div>
 
       <div className="flex gap-3">
@@ -71,9 +72,14 @@ export default function ProjectsPage() {
           <div key={proj.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:border-[#0f2d5e]/30 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between mb-2">
               <h3 className="font-semibold text-[#0e1523] font-bengali">{proj.nameBn || proj.name}</h3>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold font-bengali ${STATUS_COLORS[proj.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                {STATUS_BN[proj.status] ?? proj.status}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold font-bengali ${STATUS_COLORS[proj.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                  {STATUS_BN[proj.status] ?? proj.status}
+                </span>
+                <Link href={`/projects/${proj.id}`} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#0f2d5e] transition">
+                  <Eye size={15} />
+                </Link>
+              </div>
             </div>
             {/* Progress bar */}
             <div className="mb-3">

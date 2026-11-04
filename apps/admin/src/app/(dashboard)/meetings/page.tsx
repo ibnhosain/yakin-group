@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { formatDate, formatDateTime, toBengaliNumber } from '@yakin/utils'
-import { CalendarDays, Plus, Users, Clock, MapPin } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, Plus, Users, Clock, MapPin, Eye } from 'lucide-react'
 
 interface Meeting {
   id: string; title: string; titleBn?: string; agenda?: string
@@ -39,9 +40,9 @@ export default function MeetingsPage() {
           <h1 className="text-xl font-bold text-[#0e1523] font-bengali">সভা ব্যবস্থাপনা</h1>
           <p className="text-sm text-gray-500 font-bengali mt-0.5">সকল সভার সময়সূচী</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
+        <Link href="/meetings/new" className="flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#1a3f7a] transition">
           <Plus size={16} /> নতুন সভা
-        </button>
+        </Link>
       </div>
 
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
@@ -77,6 +78,7 @@ export default function MeetingsPage() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 font-bengali mb-3">{TYPE_BN[meeting.meetingType] ?? meeting.meetingType}</p>
+
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div className="flex items-center gap-1.5 text-gray-600">
                     <Clock size={13} className="text-gray-400" />
@@ -94,6 +96,9 @@ export default function MeetingsPage() {
                   </div>
                 </div>
               </div>
+              <Link href={`/meetings/${meeting.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#0f2d5e] transition ml-2 self-start">
+                <Eye size={16} />
+              </Link>
             </div>
           </div>
         ))}
