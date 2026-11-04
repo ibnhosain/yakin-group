@@ -30,6 +30,14 @@ const updateStatusSchema = z.object({ status: z.enum(['ACTIVE', 'SUSPENDED', 'EX
 
 export async function memberRoutes(fastify: FastifyInstance): Promise<void> {
 
+  // GET /api/members/categories
+  fastify.get('/categories', { preHandler: [authenticate] },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      const categories = await fastify.prisma.memberCategory.findMany({ orderBy: { name: 'asc' } })
+      return sendSuccess(reply, categories)
+    }
+  )
+
   // GET /api/members
   fastify.get('/', { preHandler: [authenticate, requirePermission('members:read')] },
     async (request: FastifyRequest<{ Querystring: { page?: string; limit?: string; search?: string; status?: string; categoryId?: string } }>, reply: FastifyReply) => {
