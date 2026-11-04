@@ -22,22 +22,27 @@ function Field({ label, required, children }: { label: string; required?: boolea
 export default function NewInvestorPage() {
   const router = useRouter()
   const [form, setForm] = useState({
-    fullName: '', fullNameBn: '', phone: '', email: '',
-    nidNo: '', address: '', addressBn: '',
+    fullName: '', fullNameBn: '', phone: '', email: '', password: '',
+    nidNumber: '', address: '',
+    bankName: '', bankAccount: '', bankBranch: '',
   })
   const [error, setError] = useState('')
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const mutation = useMutation({
     mutationFn: () => api.post('/api/investors', {
-      ...form,
-      email: form.email || undefined,
+      fullName: form.fullName,
       fullNameBn: form.fullNameBn || undefined,
-      nidNo: form.nidNo || undefined,
+      phone: form.phone,
+      email: form.email || undefined,
+      password: form.password || 'Yakin@2024',
+      nidNumber: form.nidNumber || undefined,
       address: form.address || undefined,
-      addressBn: form.addressBn || undefined,
+      bankName: form.bankName || undefined,
+      bankAccount: form.bankAccount || undefined,
+      bankBranch: form.bankBranch || undefined,
     }),
-    onSuccess: () => router.push('/investors'),
+    onSuccess: (res: { data: { data: { id: string } } }) => router.push(`/investors/${res.data.data.id}`),
     onError: (e: { response?: { data?: { messageBn?: string; message?: string } } }) => {
       setError(e.response?.data?.messageBn ?? e.response?.data?.message ?? 'ত্রুটি হয়েছে')
     },
@@ -75,15 +80,30 @@ export default function NewInvestorPage() {
             <input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
           </Field>
           <Field label="জাতীয় পরিচয়পত্র নম্বর">
-            <input className={inputCls} value={form.nidNo} onChange={e => set('nidNo', e.target.value)} placeholder="NID নম্বর" />
+            <input className={inputCls} value={form.nidNumber} onChange={e => set('nidNumber', e.target.value)} placeholder="NID নম্বর" />
+          </Field>
+          <Field label="লগইন পাসওয়ার্ড">
+            <input type="password" className={inputCls} value={form.password} onChange={e => set('password', e.target.value)} placeholder="কমপক্ষে ৮ অক্ষর (খালি রাখলে ডিফল্ট)" />
           </Field>
         </div>
-        <Field label="ঠিকানা (ইংরেজি)">
-          <textarea className={inputCls} rows={2} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Address" />
+        <Field label="ঠিকানা">
+          <textarea className={inputCls} rows={2} value={form.address} onChange={e => set('address', e.target.value)} placeholder="বর্তমান ঠিকানা" />
         </Field>
-        <Field label="ঠিকানা (বাংলা)">
-          <textarea className={inputCls} rows={2} value={form.addressBn} onChange={e => set('addressBn', e.target.value)} placeholder="বাংলায় ঠিকানা লিখুন" />
-        </Field>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-[#0f2d5e] font-bengali border-b border-gray-100 pb-2">ব্যাংক তথ্য</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="ব্যাংকের নাম">
+            <input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Bank Name" />
+          </Field>
+          <Field label="অ্যাকাউন্ট নম্বর">
+            <input className={inputCls} value={form.bankAccount} onChange={e => set('bankAccount', e.target.value)} placeholder="Account Number" />
+          </Field>
+          <Field label="ব্রাঞ্চ">
+            <input className={inputCls} value={form.bankBranch} onChange={e => set('bankBranch', e.target.value)} placeholder="Branch Name" />
+          </Field>
+        </div>
       </div>
 
       <div className="flex gap-3 justify-end pb-6">

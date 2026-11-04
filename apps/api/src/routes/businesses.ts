@@ -8,15 +8,13 @@ import { writeAuditLog } from '../utils/audit'
 const createSchema = z.object({
   name: z.string().min(2),
   nameBn: z.string().optional(),
-  categoryId: z.string().optional(),
+  categoryId: z.string().min(1),
   description: z.string().optional(),
-  descriptionBn: z.string().optional(),
-  address: z.string().optional(),
-  addressBn: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  tradeLicense: z.string().optional(),
-  establishedDate: z.string().optional(),
+  location: z.string().optional(),
+  capital: z.number().int().default(0),
+  licenseNo: z.string().optional(),
+  taxId: z.string().optional(),
+  startedAt: z.string().optional(),
 })
 
 export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
@@ -47,8 +45,7 @@ export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
           orderBy: { createdAt: 'desc' },
           include: {
             category: { select: { name: true, nameBn: true } },
-            _count: { select: { investments: true } },
-            investments: { select: { amount: true } },
+            _count: { select: { projects: true, employees: true } },
           },
         }),
         fastify.prisma.business.count({ where }),
@@ -58,8 +55,10 @@ export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
         id: biz.id, name: biz.name, nameBn: biz.nameBn,
         category: biz.category?.nameBn ?? biz.category?.name ?? 'অন্যান্য',
         status: biz.status,
-        totalInvestment: biz.investments.reduce((s, i) => s + i.amount, 0),
-        establishedDate: biz.establishedDate?.toISOString() ?? null,
+        capital: biz.capital,
+        projectCount: biz._count.projects,
+        employeeCount: biz._count.employees,
+        startedAt: biz.startedAt?.toISOString() ?? null,
         createdAt: biz.createdAt.toISOString(),
       }))
 
@@ -74,7 +73,11 @@ export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
         where: { id: req.params.id, deletedAt: null },
         include: {
           category: true,
-          investments: { include: { investor: { select: { fullName: true, fullNameBn: true } } } },
+          projects: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 10, select: { id: true, name: true, nameBn: true, status: true, progressPercent: true, budget: true } },
+          employees: {
+            where: { deletedAt: null }, take: 10,
+            include: { user: { select: { fullName: true, fullNameBn: true } }, designation: { select: { name: true, nameBn: true } } },
+          },
         },
       })
       if (!biz) return sendError(reply, 'Business not found', 'ব্যবসা পাওয়া যায়নি', 404)
@@ -88,11 +91,15 @@ export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
       const body = createSchema.safeParse(req.body)
       if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
 
+      const { startedAt, ...rest } = body.data
+
+      const category = await fastify.prisma.businessCategory.findUnique({ where: { id: rest.categoryId } })
+      if (!category) return sendError(reply, 'Category not found', 'ক্যাটাগরি পাওয়া যায়নি', 404)
+
       const business = await fastify.prisma.business.create({
         data: {
-          ...body.data,
-          establishedDate: body.data.establishedDate ? new Date(body.data.establishedDate) : null,
-          createdById: req.user.sub,
+          ...rest,
+          startedAt: startedAt ? new Date(startedAt) : undefined,
         },
       })
 

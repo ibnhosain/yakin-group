@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { authenticate } from '../middleware/auth'
 import { requirePermission } from '../middleware/rbac'
@@ -7,43 +8,50 @@ import { writeAuditLog } from '../utils/audit'
 import { generateEmployeeNo } from '@yakin/utils'
 
 const createSchema = z.object({
-  userId: z.string().optional(),
+  // User fields
   fullName: z.string().min(2),
   fullNameBn: z.string().optional(),
-  phone: z.string(),
+  phone: z.string().min(11),
   email: z.string().email().optional(),
-  nidNo: z.string().optional(),
-  department: z.string(),
-  designation: z.string(),
-  joinDate: z.string(),
+  password: z.string().min(8).default('Yakin@2024'),
+  // Employee fields
+  departmentId: z.string().optional(),
+  designationId: z.string().optional(),
+  nidNumber: z.string().optional(),
+  joiningDate: z.string(),
   basicSalary: z.number().int().positive(),
-  bankAccount: z.string().optional(),
   address: z.string().optional(),
-  addressBn: z.string().optional(),
-  emergencyContact: z.string().optional(),
+  emergencyPhone: z.string().optional(),
+  bankAccountNo: z.string().optional(),
+  bankName: z.string().optional(),
 })
 
 export async function employeeRoutes(fastify: FastifyInstance): Promise<void> {
 
   // GET /api/hr/employees
   fastify.get('/', { preHandler: [authenticate, requirePermission('employees:read')] },
-    async (req: FastifyRequest<{ Querystring: { search?: string; status?: string; department?: string; page?: string; limit?: string } }>, reply: FastifyReply) => {
-      const { search, status, department, page = '1', limit = '20' } = req.query
+    async (req: FastifyRequest<{ Querystring: { search?: string; status?: string; departmentId?: string; page?: string; limit?: string } }>, reply: FastifyReply) => {
+      const { search, status, departmentId, page = '1', limit = '20' } = req.query
       const p = parseInt(page); const l = parseInt(limit)
       const where: Record<string, unknown> = { deletedAt: null }
       if (status) where.status = status
-      if (department) where.department = department
+      if (departmentId) where.departmentId = departmentId
       if (search) where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { fullNameBn: { contains: search } },
         { employeeNo: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } },
+        { user: { fullName: { contains: search, mode: 'insensitive' } } },
+        { user: { fullNameBn: { contains: search } } },
+        { user: { phone: { contains: search } } },
       ]
 
       const [employees, total] = await Promise.all([
         fastify.prisma.employee.findMany({
           where, skip: (p-1)*l, take: l,
           orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { fullName: true, fullNameBn: true, phone: true, email: true } },
+            department: { select: { name: true, nameBn: true } },
+            designation: { select: { name: true, nameBn: true } },
+          },
         }),
         fastify.prisma.employee.count({ where }),
       ])
@@ -51,13 +59,14 @@ export async function employeeRoutes(fastify: FastifyInstance): Promise<void> {
       const data = employees.map(emp => ({
         id: emp.id,
         employeeNo: emp.employeeNo,
-        fullName: emp.fullName,
-        fullNameBn: emp.fullNameBn,
-        department: emp.department,
-        designation: emp.designation,
+        fullName: emp.user.fullName,
+        fullNameBn: emp.user.fullNameBn,
+        phone: emp.user.phone,
+        department: emp.department?.nameBn ?? emp.department?.name ?? '—',
+        designation: emp.designation?.nameBn ?? emp.designation?.name ?? '—',
         basicSalary: emp.basicSalary,
         status: emp.status,
-        joinDate: emp.joinDate.toISOString(),
+        joiningDate: emp.joiningDate.toISOString(),
         createdAt: emp.createdAt.toISOString(),
       }))
 
@@ -71,7 +80,10 @@ export async function employeeRoutes(fastify: FastifyInstance): Promise<void> {
       const emp = await fastify.prisma.employee.findFirst({
         where: { id: req.params.id, deletedAt: null },
         include: {
-          attendances: { take: 30, orderBy: { date: 'desc' } },
+          user: { select: { fullName: true, fullNameBn: true, email: true, phone: true } },
+          department: { select: { name: true, nameBn: true } },
+          designation: { select: { name: true, nameBn: true } },
+          attendance: { take: 15, orderBy: { date: 'desc' } },
           leaveRequests: { take: 10, orderBy: { createdAt: 'desc' } },
           payrollRecords: { take: 12, orderBy: { year: 'desc' } },
         },
@@ -87,23 +99,41 @@ export async function employeeRoutes(fastify: FastifyInstance): Promise<void> {
       const body = createSchema.safeParse(req.body)
       if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
 
+      const { fullName, fullNameBn, phone, email, password, joiningDate, ...empData } = body.data
+
+      const existing = await fastify.prisma.user.findFirst({
+        where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
+      })
+      if (existing) return sendError(reply, 'Phone or email already registered', 'ফোন বা ইমেইল ইতিমধ্যে নিবন্ধিত', 409)
+
+      const employeeRole = await fastify.prisma.role.findUnique({ where: { name: 'employee' } })
+      if (!employeeRole) return sendError(reply, 'Role not configured', 'ভূমিকা কনফিগার করা হয়নি', 500)
+
+      const passwordHash = await bcrypt.hash(password, 12)
       const employeeNo = generateEmployeeNo()
-      const employee = await fastify.prisma.employee.create({
-        data: {
-          ...body.data,
-          employeeNo,
-          joinDate: new Date(body.data.joinDate),
-          createdById: req.user.sub,
-        },
+
+      const result = await fastify.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { roleId: employeeRole.id, fullName, fullNameBn, phone, email, passwordHash },
+        })
+        const employee = await tx.employee.create({
+          data: {
+            userId: user.id,
+            employeeNo,
+            joiningDate: new Date(joiningDate),
+            ...empData,
+          },
+        })
+        return employee
       })
 
       await writeAuditLog(fastify.prisma, {
         userId: req.user.sub, action: 'CREATE_EMPLOYEE',
-        tableName: 'employees', recordId: employee.id,
-        newData: body.data, ipAddress: req.ip,
+        tableName: 'employees', recordId: result.id,
+        newData: { fullName, phone, employeeNo }, ipAddress: req.ip,
       })
 
-      return sendSuccess(reply, { id: employee.id, employeeNo }, 'Employee created', 'কর্মী যুক্ত হয়েছে', 201)
+      return sendSuccess(reply, { id: result.id, employeeNo }, 'Employee created', 'কর্মী যুক্ত হয়েছে', 201)
     }
   )
 }

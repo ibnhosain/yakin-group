@@ -25,10 +25,11 @@ interface Desig { id: string; name: string; nameBn: string }
 export default function NewEmployeePage() {
   const router = useRouter()
   const [form, setForm] = useState({
-    fullName: '', fullNameBn: '', phone: '', email: '',
-    nidNo: '', department: '', designation: '',
-    joinDate: '', basicSalary: '', bankAccount: '',
-    address: '', addressBn: '', emergencyContact: '',
+    fullName: '', fullNameBn: '', phone: '', email: '', password: '',
+    nidNumber: '', departmentId: '', designationId: '',
+    joiningDate: '', basicSalary: '',
+    address: '', emergencyPhone: '',
+    bankAccountNo: '', bankName: '',
   })
   const [error, setError] = useState('')
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -44,17 +45,22 @@ export default function NewEmployeePage() {
 
   const mutation = useMutation({
     mutationFn: () => api.post('/api/hr/employees', {
-      ...form,
-      basicSalary: parseInt(form.basicSalary) * 100,
-      email: form.email || undefined,
+      fullName: form.fullName,
       fullNameBn: form.fullNameBn || undefined,
-      nidNo: form.nidNo || undefined,
-      bankAccount: form.bankAccount || undefined,
+      phone: form.phone,
+      email: form.email || undefined,
+      password: form.password || 'Yakin@2024',
+      nidNumber: form.nidNumber || undefined,
+      departmentId: form.departmentId || undefined,
+      designationId: form.designationId || undefined,
+      joiningDate: form.joiningDate,
+      basicSalary: Math.round(parseFloat(form.basicSalary) * 100),
       address: form.address || undefined,
-      addressBn: form.addressBn || undefined,
-      emergencyContact: form.emergencyContact || undefined,
+      emergencyPhone: form.emergencyPhone || undefined,
+      bankAccountNo: form.bankAccountNo || undefined,
+      bankName: form.bankName || undefined,
     }),
-    onSuccess: () => router.push('/hr'),
+    onSuccess: (res: { data: { data: { id: string } } }) => router.push(`/hr/${res.data.data.id}`),
     onError: (e: { response?: { data?: { messageBn?: string; message?: string } } }) => {
       setError(e.response?.data?.messageBn ?? e.response?.data?.message ?? 'ত্রুটি হয়েছে')
     },
@@ -88,40 +94,52 @@ export default function NewEmployeePage() {
             <input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
           </Field>
           <Field label="NID নম্বর">
-            <input className={inputCls} value={form.nidNo} onChange={e => set('nidNo', e.target.value)} placeholder="জাতীয় পরিচয়পত্র নম্বর" />
+            <input className={inputCls} value={form.nidNumber} onChange={e => set('nidNumber', e.target.value)} placeholder="জাতীয় পরিচয়পত্র নম্বর" />
           </Field>
           <Field label="জরুরি যোগাযোগ">
-            <input className={inputCls} value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} placeholder="01XXXXXXXXX" />
+            <input className={inputCls} value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} placeholder="01XXXXXXXXX" />
+          </Field>
+          <Field label="লগইন পাসওয়ার্ড">
+            <input type="password" className={inputCls} value={form.password} onChange={e => set('password', e.target.value)} placeholder="কমপক্ষে ৮ অক্ষর (খালি রাখলে ডিফল্ট)" />
           </Field>
         </div>
-        <Field label="ঠিকানা (বাংলা)">
-          <textarea className={inputCls} rows={2} value={form.addressBn} onChange={e => set('addressBn', e.target.value)} placeholder="বর্তমান ঠিকানা" />
+        <Field label="ঠিকানা">
+          <textarea className={inputCls} rows={2} value={form.address} onChange={e => set('address', e.target.value)} placeholder="বর্তমান ঠিকানা" />
         </Field>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
         <h2 className="text-sm font-semibold text-[#0f2d5e] font-bengali border-b border-gray-100 pb-2">চাকরির তথ্য</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="বিভাগ" required>
-            <select className={inputCls} value={form.department} onChange={e => set('department', e.target.value)}>
+          <Field label="বিভাগ">
+            <select className={inputCls} value={form.departmentId} onChange={e => set('departmentId', e.target.value)}>
               <option value="">বিভাগ বাছাই করুন</option>
-              {depts?.map(d => <option key={d.id} value={d.name}>{d.nameBn}</option>)}
+              {depts?.map(d => <option key={d.id} value={d.id}>{d.nameBn ?? d.name}</option>)}
             </select>
           </Field>
-          <Field label="পদবি" required>
-            <select className={inputCls} value={form.designation} onChange={e => set('designation', e.target.value)}>
+          <Field label="পদবি">
+            <select className={inputCls} value={form.designationId} onChange={e => set('designationId', e.target.value)}>
               <option value="">পদবি বাছাই করুন</option>
-              {desigs?.map(d => <option key={d.id} value={d.name}>{d.nameBn}</option>)}
+              {desigs?.map(d => <option key={d.id} value={d.id}>{d.nameBn ?? d.name}</option>)}
             </select>
           </Field>
           <Field label="যোগদানের তারিখ" required>
-            <input type="date" className={inputCls} value={form.joinDate} onChange={e => set('joinDate', e.target.value)} />
+            <input type="date" className={inputCls} value={form.joiningDate} onChange={e => set('joiningDate', e.target.value)} />
           </Field>
           <Field label="মূল বেতন (টাকা)" required>
-            <input type="number" className={inputCls} value={form.basicSalary} onChange={e => set('basicSalary', e.target.value)} placeholder="মাসিক বেতন" min="0" />
+            <input type="number" min="0" step="0.01" className={inputCls} value={form.basicSalary} onChange={e => set('basicSalary', e.target.value)} placeholder="মাসিক বেতন" />
           </Field>
-          <Field label="ব্যাংক অ্যাকাউন্ট নম্বর">
-            <input className={inputCls} value={form.bankAccount} onChange={e => set('bankAccount', e.target.value)} placeholder="অ্যাকাউন্ট নম্বর" />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-[#0f2d5e] font-bengali border-b border-gray-100 pb-2">ব্যাংক তথ্য</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="ব্যাংকের নাম">
+            <input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Bank Name" />
+          </Field>
+          <Field label="অ্যাকাউন্ট নম্বর">
+            <input className={inputCls} value={form.bankAccountNo} onChange={e => set('bankAccountNo', e.target.value)} placeholder="Account Number" />
           </Field>
         </div>
       </div>
@@ -130,7 +148,7 @@ export default function NewEmployeePage() {
         <Link href="/hr" className="px-5 py-2 rounded-lg border border-gray-200 text-sm font-bengali text-gray-600 hover:bg-gray-50">বাতিল</Link>
         <button
           onClick={() => { setError(''); mutation.mutate() }}
-          disabled={mutation.isPending || !form.fullName || !form.phone || !form.department || !form.designation || !form.joinDate || !form.basicSalary}
+          disabled={mutation.isPending || !form.fullName || !form.phone || !form.joiningDate || !form.basicSalary}
           className="flex items-center gap-2 px-5 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#0a1c3b] disabled:opacity-50 transition"
         >
           {mutation.isPending && <Loader2 size={14} className="animate-spin" />}

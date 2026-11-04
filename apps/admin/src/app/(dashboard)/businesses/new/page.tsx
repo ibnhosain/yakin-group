@@ -21,8 +21,8 @@ interface BizCategory { id: string; name: string; nameBn: string }
 export default function NewBusinessPage() {
   const router = useRouter()
   const [form, setForm] = useState({
-    name: '', nameBn: '', categoryId: '', description: '', descriptionBn: '',
-    address: '', addressBn: '', phone: '', email: '', tradeLicense: '', establishedDate: '',
+    name: '', nameBn: '', categoryId: '', description: '',
+    location: '', capital: '', licenseNo: '', taxId: '', startedAt: '',
   })
   const [error, setError] = useState('')
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -34,15 +34,17 @@ export default function NewBusinessPage() {
 
   const mutation = useMutation({
     mutationFn: () => api.post('/api/businesses', {
-      ...form,
-      nameBn: form.nameBn || undefined, categoryId: form.categoryId || undefined,
-      description: form.description || undefined, descriptionBn: form.descriptionBn || undefined,
-      address: form.address || undefined, addressBn: form.addressBn || undefined,
-      phone: form.phone || undefined, email: form.email || undefined,
-      tradeLicense: form.tradeLicense || undefined,
-      establishedDate: form.establishedDate || undefined,
+      name: form.name,
+      nameBn: form.nameBn || undefined,
+      categoryId: form.categoryId,
+      description: form.description || undefined,
+      location: form.location || undefined,
+      capital: form.capital ? Math.round(parseFloat(form.capital) * 100) : 0,
+      licenseNo: form.licenseNo || undefined,
+      taxId: form.taxId || undefined,
+      startedAt: form.startedAt || undefined,
     }),
-    onSuccess: () => router.push('/businesses'),
+    onSuccess: (res: { data: { data: { id: string } } }) => router.push(`/businesses/${res.data.data.id}`),
     onError: (e: { response?: { data?: { messageBn?: string; message?: string } } }) => {
       setError(e.response?.data?.messageBn ?? e.response?.data?.message ?? 'ত্রুটি হয়েছে')
     },
@@ -69,30 +71,30 @@ export default function NewBusinessPage() {
           <Field label="ব্যবসার নাম (বাংলা)">
             <input className={inputCls} value={form.nameBn} onChange={e => set('nameBn', e.target.value)} placeholder="বাংলায় নাম" />
           </Field>
-          <Field label="ক্যাটাগরি">
+          <Field label="ক্যাটাগরি" required>
             <select className={inputCls} value={form.categoryId} onChange={e => set('categoryId', e.target.value)}>
               <option value="">ক্যাটাগরি বাছাই করুন</option>
               {cats?.map(c => <option key={c.id} value={c.id}>{c.nameBn}</option>)}
             </select>
           </Field>
           <Field label="প্রতিষ্ঠার তারিখ">
-            <input type="date" className={inputCls} value={form.establishedDate} onChange={e => set('establishedDate', e.target.value)} />
+            <input type="date" className={inputCls} value={form.startedAt} onChange={e => set('startedAt', e.target.value)} />
+          </Field>
+          <Field label="অবস্থান / ঠিকানা">
+            <input className={inputCls} value={form.location} onChange={e => set('location', e.target.value)} placeholder="জেলা, বিভাগ" />
+          </Field>
+          <Field label="মূলধন (টাকা)">
+            <input type="number" min="0" step="0.01" className={inputCls} value={form.capital} onChange={e => set('capital', e.target.value)} placeholder="0.00" />
           </Field>
           <Field label="ট্রেড লাইসেন্স নম্বর">
-            <input className={inputCls} value={form.tradeLicense} onChange={e => set('tradeLicense', e.target.value)} placeholder="লাইসেন্স নম্বর" />
+            <input className={inputCls} value={form.licenseNo} onChange={e => set('licenseNo', e.target.value)} placeholder="লাইসেন্স নম্বর" />
           </Field>
-          <Field label="ফোন নম্বর">
-            <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="01XXXXXXXXX" />
-          </Field>
-          <Field label="ইমেইল">
-            <input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
+          <Field label="ট্যাক্স আইডি">
+            <input className={inputCls} value={form.taxId} onChange={e => set('taxId', e.target.value)} placeholder="TIN / Tax ID" />
           </Field>
         </div>
-        <Field label="বিবরণ (বাংলা)">
-          <textarea className={inputCls} rows={3} value={form.descriptionBn} onChange={e => set('descriptionBn', e.target.value)} placeholder="ব্যবসার বিবরণ লিখুন" />
-        </Field>
-        <Field label="ঠিকানা">
-          <textarea className={inputCls} rows={2} value={form.addressBn} onChange={e => set('addressBn', e.target.value)} placeholder="ব্যবসার ঠিকানা" />
+        <Field label="বিবরণ">
+          <textarea className={inputCls} rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="ব্যবসার সংক্ষিপ্ত বিবরণ" />
         </Field>
       </div>
 
@@ -100,7 +102,7 @@ export default function NewBusinessPage() {
         <Link href="/businesses" className="px-5 py-2 rounded-lg border border-gray-200 text-sm font-bengali text-gray-600 hover:bg-gray-50">বাতিল</Link>
         <button
           onClick={() => { setError(''); mutation.mutate() }}
-          disabled={mutation.isPending || !form.name}
+          disabled={mutation.isPending || !form.name || !form.categoryId}
           className="flex items-center gap-2 px-5 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#0a1c3b] disabled:opacity-50 transition"
         >
           {mutation.isPending && <Loader2 size={14} className="animate-spin" />}

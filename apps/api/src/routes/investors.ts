@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { authenticate } from '../middleware/auth'
 import { requirePermission } from '../middleware/rbac'
@@ -7,14 +8,16 @@ import { writeAuditLog } from '../utils/audit'
 import { generateInvestorNo } from '@yakin/utils'
 
 const createSchema = z.object({
-  userId: z.string().optional(),
   fullName: z.string().min(2),
   fullNameBn: z.string().optional(),
-  phone: z.string(),
+  phone: z.string().min(11),
   email: z.string().email().optional(),
-  nidNo: z.string().optional(),
+  password: z.string().min(8).default('Yakin@2024'),
+  nidNumber: z.string().optional(),
   address: z.string().optional(),
-  addressBn: z.string().optional(),
+  bankName: z.string().optional(),
+  bankAccount: z.string().optional(),
+  bankBranch: z.string().optional(),
 })
 
 export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
@@ -27,10 +30,10 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
       const where: Record<string, unknown> = { deletedAt: null }
       if (status) where.status = status
       if (search) where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { fullNameBn: { contains: search } },
         { investorNo: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } },
+        { user: { fullName: { contains: search, mode: 'insensitive' } } },
+        { user: { fullNameBn: { contains: search } } },
+        { user: { phone: { contains: search } } },
       ]
 
       const [investors, total] = await Promise.all([
@@ -38,8 +41,9 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
           where, skip: (p-1)*l, take: l,
           orderBy: { createdAt: 'desc' },
           include: {
+            user: { select: { fullName: true, fullNameBn: true, phone: true, email: true } },
             _count: { select: { investments: { where: { status: 'ACTIVE' } } } },
-            investments: { where: { status: 'ACTIVE' }, select: { amount: true } },
+            investments: { where: { status: 'ACTIVE' }, select: { principalAmount: true } },
           },
         }),
         fastify.prisma.investor.count({ where }),
@@ -48,11 +52,12 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
       const data = investors.map(inv => ({
         id: inv.id,
         investorNo: inv.investorNo,
-        fullName: inv.fullName,
-        fullNameBn: inv.fullNameBn,
-        phone: inv.phone,
+        fullName: inv.user.fullName,
+        fullNameBn: inv.user.fullNameBn,
+        phone: inv.user.phone,
+        email: inv.user.email,
         status: inv.status,
-        totalInvestment: inv.investments.reduce((s, i) => s + i.amount, 0),
+        totalInvestment: inv.investments.reduce((s, i) => s + i.principalAmount, 0),
         activeInvestments: inv._count.investments,
         createdAt: inv.createdAt.toISOString(),
       }))
@@ -67,6 +72,7 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
       const inv = await fastify.prisma.investor.findFirst({
         where: { id: req.params.id, deletedAt: null },
         include: {
+          user: { select: { fullName: true, fullNameBn: true, email: true, phone: true } },
           investments: {
             include: { plan: { select: { name: true, nameBn: true, returnRate: true } } },
             orderBy: { createdAt: 'desc' },
@@ -84,18 +90,37 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
       const body = createSchema.safeParse(req.body)
       if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
 
+      const { fullName, fullNameBn, phone, email, password, ...investorData } = body.data
+
+      // Check duplicate phone/email
+      const existing = await fastify.prisma.user.findFirst({
+        where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
+      })
+      if (existing) return sendError(reply, 'Phone or email already registered', 'ফোন বা ইমেইল ইতিমধ্যে নিবন্ধিত', 409)
+
+      const investorRole = await fastify.prisma.role.findUnique({ where: { name: 'investor' } })
+      if (!investorRole) return sendError(reply, 'Role not configured', 'ভূমিকা কনফিগার করা হয়নি', 500)
+
+      const passwordHash = await bcrypt.hash(password, 12)
       const investorNo = generateInvestorNo()
-      const investor = await fastify.prisma.investor.create({
-        data: { ...body.data, investorNo, createdById: req.user.sub },
+
+      const result = await fastify.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { roleId: investorRole.id, fullName, fullNameBn, phone, email, passwordHash },
+        })
+        const investor = await tx.investor.create({
+          data: { userId: user.id, investorNo, ...investorData },
+        })
+        return investor
       })
 
       await writeAuditLog(fastify.prisma, {
         userId: req.user.sub, action: 'CREATE_INVESTOR',
-        tableName: 'investors', recordId: investor.id,
-        newData: body.data, ipAddress: req.ip,
+        tableName: 'investors', recordId: result.id,
+        newData: { fullName, phone, investorNo }, ipAddress: req.ip,
       })
 
-      return sendSuccess(reply, { id: investor.id, investorNo }, 'Investor created', 'বিনিয়োগকারী যুক্ত হয়েছে', 201)
+      return sendSuccess(reply, { id: result.id, investorNo }, 'Investor created', 'বিনিয়োগকারী যুক্ত হয়েছে', 201)
     }
   )
 
