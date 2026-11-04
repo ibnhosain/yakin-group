@@ -66,6 +66,29 @@ export async function documentRoutes(fastify: FastifyInstance): Promise<void> {
     }
   )
 
+  // GET /api/documents/:id
+  fastify.get('/:id', { preHandler: [authenticate, requirePermission('documents:read')] },
+    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const doc = await fastify.prisma.document.findFirst({
+        where: { id: req.params.id, deletedAt: null },
+        include: {
+          category: { select: { name: true, nameBn: true } },
+          uploadedBy: { select: { fullName: true } },
+        },
+      })
+      if (!doc) return sendError(reply, 'Document not found', 'দলিল পাওয়া যায়নি', 404)
+      return sendSuccess(reply, {
+        id: doc.id, title: doc.title, description: doc.description,
+        categoryName: doc.category?.nameBn ?? doc.category?.name ?? '—',
+        fileName: doc.fileName, fileSize: doc.fileSize, mimeType: doc.mimeType,
+        fileUrl: doc.fileUrl, ownerType: doc.ownerType, ownerId: doc.ownerId,
+        uploadedByName: doc.uploadedBy.fullName,
+        expiresAt: doc.expiresAt?.toISOString() ?? null,
+        createdAt: doc.createdAt.toISOString(),
+      })
+    }
+  )
+
   // POST /api/documents
   fastify.post('/', { preHandler: [authenticate, requirePermission('documents:create')] },
     async (req: FastifyRequest, reply: FastifyReply) => {

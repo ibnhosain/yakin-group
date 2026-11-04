@@ -112,4 +112,36 @@ export async function businessRoutes(fastify: FastifyInstance): Promise<void> {
       return sendSuccess(reply, { id: business.id }, 'Business created', 'ব্যবসা যুক্ত হয়েছে', 201)
     }
   )
+
+  // PATCH /api/businesses/:id
+  fastify.patch('/:id', { preHandler: [authenticate, requirePermission('businesses:update')] },
+    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const updateSchema = z.object({
+        name: z.string().min(2).optional(),
+        nameBn: z.string().optional().nullable(),
+        categoryId: z.string().optional(),
+        description: z.string().optional().nullable(),
+        location: z.string().optional().nullable(),
+        capital: z.number().int().optional(),
+        licenseNo: z.string().optional().nullable(),
+        taxId: z.string().optional().nullable(),
+        startedAt: z.string().optional().nullable(),
+        status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'DISSOLVED']).optional(),
+      })
+      const body = updateSchema.safeParse(req.body)
+      if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
+
+      const biz = await fastify.prisma.business.findFirst({ where: { id: req.params.id, deletedAt: null } })
+      if (!biz) return sendError(reply, 'Business not found', 'ব্যবসা পাওয়া যায়নি', 404)
+
+      const { startedAt, ...rest } = body.data
+      await fastify.prisma.business.update({
+        where: { id: biz.id },
+        data: { ...rest, ...(startedAt !== undefined && { startedAt: startedAt ? new Date(startedAt) : null }) },
+      })
+
+      await writeAuditLog(fastify.prisma, { userId: req.user.sub, action: 'UPDATE_BUSINESS', tableName: 'businesses', recordId: biz.id, newData: body.data, ipAddress: req.ip })
+      return sendSuccess(reply, null, 'Business updated', 'ব্যবসার তথ্য আপডেট হয়েছে')
+    }
+  )
 }

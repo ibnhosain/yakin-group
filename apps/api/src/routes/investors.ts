@@ -124,6 +124,43 @@ export async function investorRoutes(fastify: FastifyInstance): Promise<void> {
     }
   )
 
+  // PATCH /api/investors/:id
+  fastify.patch('/:id', { preHandler: [authenticate, requirePermission('investors:update')] },
+    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const updateSchema = z.object({
+        fullName: z.string().min(2).optional(),
+        fullNameBn: z.string().optional(),
+        phone: z.string().min(11).optional(),
+        email: z.string().email().optional().nullable(),
+        nidNumber: z.string().optional().nullable(),
+        address: z.string().optional().nullable(),
+        bankName: z.string().optional().nullable(),
+        bankAccount: z.string().optional().nullable(),
+        bankBranch: z.string().optional().nullable(),
+      })
+      const body = updateSchema.safeParse(req.body)
+      if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
+
+      const inv = await fastify.prisma.investor.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { user: true } })
+      if (!inv) return sendError(reply, 'Investor not found', 'বিনিয়োগকারী পাওয়া যায়নি', 404)
+
+      const { fullName, fullNameBn, phone, email, ...investorFields } = body.data
+
+      await fastify.prisma.$transaction(async (tx) => {
+        if (fullName || fullNameBn !== undefined || phone || email !== undefined) {
+          await tx.user.update({
+            where: { id: inv.userId },
+            data: { ...(fullName && { fullName }), ...(fullNameBn !== undefined && { fullNameBn }), ...(phone && { phone }), ...(email !== undefined && { email }) },
+          })
+        }
+        await tx.investor.update({ where: { id: inv.id }, data: investorFields })
+      })
+
+      await writeAuditLog(fastify.prisma, { userId: req.user.sub, action: 'UPDATE_INVESTOR', tableName: 'investors', recordId: inv.id, newData: body.data, ipAddress: req.ip })
+      return sendSuccess(reply, null, 'Investor updated', 'বিনিয়োগকারীর তথ্য আপডেট হয়েছে')
+    }
+  )
+
   // PATCH /api/investors/:id/status
   fastify.patch('/:id/status', { preHandler: [authenticate, requirePermission('investors:update')] },
     async (req: FastifyRequest<{ Params: { id: string }; Body: { status: string } }>, reply: FastifyReply) => {

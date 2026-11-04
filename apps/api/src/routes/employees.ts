@@ -136,4 +136,44 @@ export async function employeeRoutes(fastify: FastifyInstance): Promise<void> {
       return sendSuccess(reply, { id: result.id, employeeNo }, 'Employee created', 'কর্মী যুক্ত হয়েছে', 201)
     }
   )
+
+  // PATCH /api/hr/employees/:id
+  fastify.patch('/:id', { preHandler: [authenticate, requirePermission('employees:update')] },
+    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const updateSchema = z.object({
+        fullName: z.string().min(2).optional(),
+        fullNameBn: z.string().optional(),
+        phone: z.string().min(11).optional(),
+        email: z.string().email().optional().nullable(),
+        departmentId: z.string().optional().nullable(),
+        designationId: z.string().optional().nullable(),
+        basicSalary: z.number().int().positive().optional(),
+        address: z.string().optional().nullable(),
+        emergencyPhone: z.string().optional().nullable(),
+        bankAccountNo: z.string().optional().nullable(),
+        bankName: z.string().optional().nullable(),
+        status: z.enum(['ACTIVE', 'ON_LEAVE', 'INACTIVE', 'TERMINATED']).optional(),
+      })
+      const body = updateSchema.safeParse(req.body)
+      if (!body.success) return sendError(reply, body.error.errors[0].message, body.error.errors[0].message, 400)
+
+      const emp = await fastify.prisma.employee.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { user: true } })
+      if (!emp) return sendError(reply, 'Employee not found', 'কর্মী পাওয়া যায়নি', 404)
+
+      const { fullName, fullNameBn, phone, email, ...empFields } = body.data
+
+      await fastify.prisma.$transaction(async (tx) => {
+        if (fullName || fullNameBn !== undefined || phone || email !== undefined) {
+          await tx.user.update({
+            where: { id: emp.userId },
+            data: { ...(fullName && { fullName }), ...(fullNameBn !== undefined && { fullNameBn }), ...(phone && { phone }), ...(email !== undefined && { email }) },
+          })
+        }
+        await tx.employee.update({ where: { id: emp.id }, data: empFields })
+      })
+
+      await writeAuditLog(fastify.prisma, { userId: req.user.sub, action: 'UPDATE_EMPLOYEE', tableName: 'employees', recordId: emp.id, newData: body.data, ipAddress: req.ip })
+      return sendSuccess(reply, null, 'Employee updated', 'কর্মীর তথ্য আপডেট হয়েছে')
+    }
+  )
 }

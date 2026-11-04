@@ -1,10 +1,13 @@
 'use client'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { formatTaka, formatDate, toBengaliNumber } from '@yakin/utils'
-import { ArrowLeft, Loader2, AlertTriangle, Building2, Users, FolderKanban } from 'lucide-react'
+import { ArrowLeft, Loader2, AlertTriangle, Users, FolderKanban, Edit2, X, Check } from 'lucide-react'
 import Link from 'next/link'
+
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2d5e]/30 focus:border-[#0f2d5e] font-bengali'
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
@@ -36,11 +39,39 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
 
 export default function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState<Record<string, string>>({})
+  const [editError, setEditError] = useState('')
 
   const { data: biz, isLoading } = useQuery({
     queryKey: ['business', id],
     queryFn: () => api.get<{ data: BusinessDetail }>(`/api/businesses/${id}`).then(r => r.data.data),
   })
+
+  const statusMutation = useMutation({
+    mutationFn: (status: string) => api.patch(`/api/businesses/${id}`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business', id] }),
+  })
+
+  const editMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) => api.patch(`/api/businesses/${id}`, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['business', id] }); setEditing(false); setEditError('') },
+    onError: (e: { response?: { data?: { messageBn?: string; message?: string } } }) => {
+      setEditError(e.response?.data?.messageBn ?? e.response?.data?.message ?? 'ত্রুটি হয়েছে')
+    },
+  })
+
+  function startEdit() {
+    if (!biz) return
+    setEditForm({
+      name: biz.name, nameBn: biz.nameBn ?? '', description: biz.description ?? '',
+      location: biz.location ?? '', capital: biz.capital ? String(biz.capital / 100) : '',
+      licenseNo: biz.licenseNo ?? '', taxId: biz.taxId ?? '',
+      startedAt: biz.startedAt ? biz.startedAt.slice(0, 10) : '',
+    })
+    setEditing(true)
+  }
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-[#0f2d5e]" size={28} /></div>
   if (!biz) return <div className="text-center py-16 text-gray-400 font-bengali"><AlertTriangle size={36} className="mx-auto mb-3" />ব্যবসা পাওয়া যায়নি</div>
@@ -56,10 +87,74 @@ export default function BusinessDetailPage() {
             <p className="text-sm text-gray-400">{biz.name}</p>
           </div>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold font-bengali border ${biz.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-          {biz.status === 'ACTIVE' ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold font-bengali border ${biz.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+            {biz.status === 'ACTIVE' ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+          </span>
+          {biz.status === 'ACTIVE' ? (
+            <button onClick={() => statusMutation.mutate('INACTIVE')} disabled={statusMutation.isPending}
+              className="px-3 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bengali">
+              নিষ্ক্রিয় করুন
+            </button>
+          ) : (
+            <button onClick={() => statusMutation.mutate('ACTIVE')} disabled={statusMutation.isPending}
+              className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-bengali">
+              সক্রিয় করুন
+            </button>
+          )}
+          <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bengali">
+            <Edit2 size={12} /> সম্পাদনা
+          </button>
+        </div>
       </div>
+
+      {/* Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center pt-10 px-4 pb-10 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-[#0e1523] font-bengali">তথ্য সম্পাদনা</h3>
+              <button onClick={() => { setEditing(false); setEditError('') }}><X size={18} className="text-gray-400" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {editError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-2 text-sm font-bengali">{editError}</div>}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: 'name', label: 'নাম (ইংরেজি)' },
+                  { key: 'nameBn', label: 'নাম (বাংলা)' },
+                  { key: 'location', label: 'অবস্থান' },
+                  { key: 'capital', label: 'মূলধন (৳)' },
+                  { key: 'licenseNo', label: 'লাইসেন্স নম্বর' },
+                  { key: 'taxId', label: 'ট্যাক্স আইডি' },
+                  { key: 'startedAt', label: 'প্রতিষ্ঠার তারিখ', type: 'date' },
+                ].map(({ key, label, type }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-gray-600 font-bengali mb-1">{label}</label>
+                    <input type={type ?? (key === 'capital' ? 'number' : 'text')} className={inputCls}
+                      value={editForm[key] ?? ''} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 font-bengali mb-1">বিবরণ</label>
+                <textarea className={inputCls} rows={3} value={editForm.description ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end px-6 py-4 border-t border-gray-100">
+              <button onClick={() => { setEditing(false); setEditError('') }} className="px-5 py-2 rounded-lg border border-gray-200 text-sm font-bengali text-gray-600 hover:bg-gray-50">বাতিল</button>
+              <button onClick={() => editMutation.mutate({
+                ...editForm,
+                capital: editForm.capital ? Math.round(parseFloat(editForm.capital) * 100) : undefined,
+              })} disabled={editMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2 bg-[#0f2d5e] text-white rounded-lg text-sm font-bengali hover:bg-[#0a1c3b] disabled:opacity-50">
+                {editMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                সংরক্ষণ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

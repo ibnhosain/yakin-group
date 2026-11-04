@@ -41,10 +41,7 @@ export default function DocumentDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['document', id],
-    queryFn: async () => {
-      const docs = await api.get<{ data: DocumentDetail[] }>(`/api/documents?search=`).then(r => r.data.data)
-      return docs.find(d => d.id === id) ?? null
-    },
+    queryFn: () => api.get<{ data: DocumentDetail }>(`/api/documents/${id}`).then(r => r.data.data),
   })
 
   const deleteMutation = useMutation({

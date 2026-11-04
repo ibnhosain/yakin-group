@@ -51,6 +51,11 @@ export default function AccountingPage() {
     enabled: tab === 'journal',
   })
 
+  const postMutation = useMutation({
+    mutationFn: (entryId: string) => api.post(`/api/accounting/journal-entries/${entryId}/post`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['journal-entries'] }),
+  })
+
   const journalMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.post('/api/accounting/journal-entries', body),
     onSuccess: () => {
@@ -210,7 +215,13 @@ export default function AccountingPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs text-gray-400">{je.refNo}</span>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bengali">{VOUCHER_TYPE_BN[je.voucherType] ?? je.voucherType}</span>
-                          {je.isPosted && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bengali flex items-center gap-1"><CheckCircle2 size={10} />পোস্টেড</span>}
+                          {je.isPosted
+                            ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bengali flex items-center gap-1"><CheckCircle2 size={10} />পোস্টেড</span>
+                            : <button onClick={() => postMutation.mutate(je.id)} disabled={postMutation.isPending}
+                                className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-bengali transition">
+                                পোস্ট করুন
+                              </button>
+                          }
                         </div>
                         <p className="text-sm font-medium text-[#0e1523] font-bengali mt-0.5">{je.descriptionBn ?? je.description}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{formatDate(je.date)}</p>
